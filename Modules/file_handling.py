@@ -55,5 +55,5 @@ class Hrtf():
         r2l = sf.read(Hrtf.db_path + self.right2left)
         r2r = sf.read(Hrtf.db_path + self.right2right)
 
-        return np.array([[l2l[0][8], l2r[0][8]], [r2l[0][8], r2r[0][8]]]) # shape: (2, 2, 200)
+        return np.array([[l2l[0][8], r2l[0][8]], [l2r[0][8], r2r[0][8]]]) # shape: (2, 2, 200)
         

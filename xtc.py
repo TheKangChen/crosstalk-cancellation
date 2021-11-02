@@ -85,6 +85,11 @@ if __name__ == "__main__":
     right2left, right2right = xtc_signal(right_signal, rightear_hrtf[0,:])
 
     # Sum Original signal with crosstalk cancellation
+    left2left = np.convolve(left2left, leftear_hrtf[0], mode='full')
+    right2left = np.convolve(right2left, leftear_hrtf[1], mode='full')
+    left2right = np.convolve(left2right, rightear_hrtf[0], mode='full')
+    right2right = np.convolve(right2right, rightear_hrtf[1], mode='full')
+
     left_channel = audio_fx.sum_audio(left_signal, left2left, right2left)
     right_channel = audio_fx.sum_audio(right_signal, left2right, right2right)
 
