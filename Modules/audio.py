@@ -40,5 +40,3 @@ class AudioEffects():
         max = np.amax(sum)
 
         return sum / max
-
-
