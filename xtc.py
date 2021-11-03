@@ -31,26 +31,35 @@ def xtc_filter(x:np.array, hrtf:np.array, attenuation, delay, max):
     recursive crosstalk cancellation
     '''
 
-    filtered_x = audio_fx.attenuation(audio_fx.delay(audio_fx.invert(x), delay), attenuation) # invert, delay, & attenuate signal
-    # filtered_x = filtered_x * hrtf**-1
+    len_x = len(x)
+    ipsilateral = np.zeros(len_x)
+    contralateral = np.copy(ipsilateral)
 
-    if audio_fx.amp_to_db(np.amax(filtered_x) / max) < -60:
-        return filtered_x
-    else:
-        return xtc_filter(filtered_x, hrtf, attenuation, delay, max) # recursive until loudness drops below rt60
+    for i in range(1,1001):
+        filtered_x = audio_fx.attenuation(audio_fx.delay(audio_fx.invert(x), delay * i), attenuation ** i) # invert, delay, & attenuate signal
+        
+        # inversed signal goes to contralateral ear (odd number of inverse)
+        if i % 2 == 0:
+            pad = np.zeros(filtered_x.size - ipsilateral.size)
+            ipsilateral = np.concatenate((ipsilateral, pad)) # compensate for delay adding size of array
+            ipsilateral = filtered_x + ipsilateral
+        else:
+            pad = np.zeros(filtered_x.size - contralateral.size)
+            contralateral = np.concatenate((contralateral, pad))
+            contralateral = filtered_x + contralateral
 
+        if audio_fx.amp_to_db(np.amax(filtered_x) / max) < -60:
+            channel_pad = np.zeros(abs(ipsilateral.size - contralateral.size))
 
-def xtc_signal(x, hrtf_side):
-    '''
-    Create crosstalk cancellation signal
-    '''
+            # one side will always be larger due to breaking loop if loudness drops below -60db
+            if ipsilateral.size < contralateral.size:
+                ipsilateral = np.concatenate((ipsilateral, channel_pad))
+            else:
+                contralateral = np.concatenate((contralateral, channel_pad))
 
-    cancel_xt = xtc_filter(x, hrtf_side, ratio, delta_t, file.max)
-
-    ipsilateral = cancel_xt[0::2]
-    contralateral = cancel_xt[1::2]
-    
-    return ipsilateral, contralateral
+            return ipsilateral, contralateral
+        else:
+            continue
 
 
 
@@ -81,23 +90,25 @@ if __name__ == "__main__":
     rightear_hrtf = hrtfs[1,:,:]
 
     # Create xtc signals as well as ipsilateral signal
-    left2left, left2right = xtc_signal(left_signal, leftear_hrtf[1,:])
-    right2left, right2right = xtc_signal(right_signal, rightear_hrtf[0,:])
+    left2left, left2right = xtc_filter(left_signal, leftear_hrtf[1,:], ratio, delta_t, file.max)
+    right2left, right2right = xtc_filter(right_signal, rightear_hrtf[0,:], ratio, delta_t, file.max)
 
-    # Sum Original signal with crosstalk cancellation
+    # Convolve with hrtf
     left2left = np.convolve(left2left, leftear_hrtf[0], mode='full')
     right2left = np.convolve(right2left, leftear_hrtf[1], mode='full')
     left2right = np.convolve(left2right, rightear_hrtf[0], mode='full')
     right2right = np.convolve(right2right, rightear_hrtf[1], mode='full')
 
+    # Sum Original signal with crosstalk cancellation
     left_channel = audio_fx.sum_audio(left_signal, left2left, right2left)
     right_channel = audio_fx.sum_audio(right_signal, left2right, right2right)
 
     length = left_channel.size if left_channel.size > right_channel.size else right_channel.size
     processed_audio = np.zeros((2,length))
-
     processed_audio[0] = left_channel
     processed_audio[1] = right_channel
     processed_audio = np.swapaxes(processed_audio, 0, 1)
+
+    processed_audio = processed_audio * (file.max / np.amax(processed_audio)) # Match original volume
 
     file.write_wav(processed_audio,filename)
