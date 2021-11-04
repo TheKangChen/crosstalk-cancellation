@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.fft import fft
 from Modules import audio, file_handling
 
 file = file_handling.FileHandling()
@@ -26,12 +27,23 @@ def calculate_geometry(speaker_span, speaker_to_head, ear_span):
     return l1, l2, delta_l, delta_t, ratio, theta
 
 
-def xtc_filter(x:np.array, hrtf:np.array, attenuation, delay, max):
+def is_contralateral():
+    while True:
+        yield True
+        yield False
+
+
+def xtc_filter(x:np.array, hrtf:np.array, attenuation, delay, max, side:str):
     '''
     recursive crosstalk cancellation
     '''
 
-    filtered_x = audio_fx.attenuation(audio_fx.delay(audio_fx.invert(x), delay), attenuation) # invert, delay, & attenuate signal
+    if side == 'left':
+        pass # Edit
+    else:
+        pass # Edit
+
+    # filtered_x = audio_fx.attenuation(audio_fx.delay(audio_fx.invert(x), delay), attenuation) # invert, delay, & attenuate signal
     # filtered_x = filtered_x * hrtf**-1
 
     if audio_fx.amp_to_db(np.amax(filtered_x) / max) < -60:
@@ -72,27 +84,24 @@ if __name__ == "__main__":
     
     l1, l2, delta_l, delta_t, ratio, theta = calculate_geometry(speaker_span, speaker_to_head, ear_span)
 
-    # Speakers
-    left_signal = signal[0]
-    right_signal = signal[1]
+    # fft of signals
+    fft_sig = np.zeros(2, len(file))
+    for i in range(0, 2):
+        fft_sig[i] = np.fft.fft(signal[i])
 
     # Get HRTF
-    l2l_hrtf = np.fft.fft(hrirs[0,0,:])
-    r2l_hrtf = np.fft.fft(hrirs[0,1,:])
-    l2r_hrtf = np.fft.fft(hrirs[1,0,:])
-    r2r_hrtf = np.fft.fft(hrirs[1,1,:])
-
-    # hrtfs
-    leftear_hrtf = [l2l_hrtf, r2l_hrtf]
-    rightear_hrtf = [l2r_hrtf, r2r_hrtf]
+    hrtfs = np.zeros(2, 2, hrirs[0,0,:].size)
+    for i in range(0, 2):
+        for k in range(0, 2):
+            hrtfs[i,k,:] = np.fft.fft(hrirs[i, k, :])
 
     # Create xtc signals as well as ipsilateral signal
-    left2left, left2right = xtc_signal(left_signal, leftear_hrtf[1,:])
-    right2left, right2right = xtc_signal(right_signal, rightear_hrtf[0,:])
+    left2left, left2right = xtc_signal(signal[0], hrtfs[0,:,:])
+    right2left, right2right = xtc_signal(signal[1], hrtfs[1,:,:])
 
     # Sum Original signal with crosstalk cancellation
-    left_channel = audio_fx.sum_audio(left_signal, left2left, right2left)
-    right_channel = audio_fx.sum_audio(right_signal, left2right, right2right)
+    left_channel = audio_fx.sum_audio(signal[0], left2left, right2left)
+    right_channel = audio_fx.sum_audio(signal[1], left2right, right2right)
 
     length = left_channel.size if left_channel.size > right_channel.size else right_channel.size
     processed_audio = np.zeros((2,length))
@@ -101,4 +110,4 @@ if __name__ == "__main__":
     processed_audio[1] = right_channel
     processed_audio = np.swapaxes(processed_audio, 0, 1)
 
-    file.write_wav(processed_audio,filename)
+    # file.write_wav(processed_audio,filename)
