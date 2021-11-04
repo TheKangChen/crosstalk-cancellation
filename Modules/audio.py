@@ -37,6 +37,21 @@ class AudioEffects():
         return np.concatenate((np.zeros(delay_samples),x))
     
 
+    def freq_delay(self, x:np.array, sec:float):
+        length = x.size
+        d_sample = int(self.samplerate * sec)
+        delay = np.zeros(length)
+
+        for i in length:
+            delay[i] += x[i] * np.exp(-1j * 2 * np.pi * i / length * d_sample)
+        
+        return delay
+
+
+    def freq_invert(self, x:np.array):
+        return 1 / x
+
+
     def invert(self, x:np.array):
         return x * -1
 

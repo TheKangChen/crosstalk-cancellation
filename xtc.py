@@ -2,7 +2,7 @@ import numpy as np
 from Modules import audio, file_handling
 
 file = file_handling.FileHandling()
-hrtfs = file_handling.Hrtf().get_hrtf()
+hrirs = file_handling.Hrir().get_hrir()
 
 '''
 Left Speaker: Left_sig + right_speaker_xtc
@@ -77,8 +77,14 @@ if __name__ == "__main__":
     right_signal = signal[1]
 
     # Get HRTF
-    leftear_hrtf = hrtfs[0,:,:]
-    rightear_hrtf = hrtfs[1,:,:]
+    l2l_hrtf = np.fft.fft(hrirs[0,0,:])
+    r2l_hrtf = np.fft.fft(hrirs[0,1,:])
+    l2r_hrtf = np.fft.fft(hrirs[1,0,:])
+    r2r_hrtf = np.fft.fft(hrirs[1,1,:])
+
+    # hrtfs
+    leftear_hrtf = [l2l_hrtf, r2l_hrtf]
+    rightear_hrtf = [l2r_hrtf, r2r_hrtf]
 
     # Create xtc signals as well as ipsilateral signal
     left2left, left2right = xtc_signal(left_signal, leftear_hrtf[1,:])
