@@ -63,8 +63,10 @@ class AudioEffects():
             if len(sig) > length:
                 length = len(sig)
         sum = np.zeros(length)
+
         for sig in args:
             sum[0:len(sig)] += sig
+        
         max = np.amax(sum)
 
         return sum / max

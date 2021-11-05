@@ -29,7 +29,12 @@ class FileHandling:
     
 
     def __len__(self):
-        return self.data[:,0].size
+        self.shape = self.data.shape
+
+        if self.shape[:,0] > self.shape[0,:]:
+            return self.shape[:,0]
+        else:
+            return self.shape[0,:]
 
 
 
