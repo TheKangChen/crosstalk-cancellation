@@ -2,6 +2,8 @@ import soundfile as sf
 import numpy as np
 from os import listdir
 
+np.seterr(divide='ignore', invalid='ignore')
+
 class FileHandling:
     def __init__(self):
         pass
@@ -31,10 +33,10 @@ class FileHandling:
     def __len__(self):
         self.shape = self.data.shape
 
-        if self.shape[:,0] > self.shape[0,:]:
-            return self.shape[:,0]
+        if self.shape[0] > self.shape[1]:
+            return self.shape[0]
         else:
-            return self.shape[0,:]
+            return self.shape[1]
 
 
 

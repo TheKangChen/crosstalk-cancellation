@@ -1,5 +1,6 @@
 import numpy as np
-from scipy.signal.signaltools import deconvolve
+
+np.seterr(divide='ignore', invalid='ignore')
 
 class AudioEffects():
     speed = 343.3 # Speed of sound at 20 degree celcius
@@ -40,9 +41,9 @@ class AudioEffects():
     def freq_delay(self, x:np.array, sec:float):
         length = x.size
         d_sample = int(self.samplerate * sec)
-        delay = np.zeros(length)
+        delay = np.zeros((length), dtype=complex)
 
-        for i in length:
+        for i in range(length):
             delay[i] += x[i] * np.exp(-1j * 2 * np.pi * i / length * d_sample)
         
         return delay
