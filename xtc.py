@@ -50,38 +50,35 @@ def pad_hrtf(hrtf:np.array, length:int):
 def xtc_filter(x:np.array, hrtf:np.array, attenuation, delay, max, side:str):
     '''
     recursive crosstalk cancellation
+    hrtf_l2r = hrtf[1,0,:]
+    hrtf_r2l = hrtf[0,1,:]
     '''
     global output
-    
 
     if side.lower() == 'left':
         contra_hrtf = hrtf[1,0,:]
-        ipsi_hrtf = hrtf[0,0,:]
+        ipsi_hrtf = hrtf[0,1,:]
     elif side.lower() == 'right':
         contra_hrtf = hrtf[0,1,:]
-        ipsi_hrtf = hrtf[1,1,:]
+        ipsi_hrtf = hrtf[1,0,:]
     else:
         raise ValueError("Input'left' or 'right'.")
     
-    filtered_x = audio_fx.freq_delay(audio_fx.freq_invert(x), delay)
+    cancel_x = audio_fx.freq_delay(audio_fx.freq_invert(x), delay)
 
     if next(is_contra) == True:
-        filtered_x *= 1 / contra_hrtf
-        filtered_x *= attenuation
-        output[1,:] += np.copy(filtered_x)
-        print('Contralateral')
+        cancel_x *= attenuation
+        cancel_x *= contra_hrtf / ipsi_hrtf # H330/H30
+        output[1,:] += cancel_x
     else:
-        filtered_x *= 1 / ipsi_hrtf
-        filtered_x *= attenuation
-        output[0,:] += np.copy(filtered_x)
-        print('Ipsilateral')
+        cancel_x *= attenuation
+        cancel_x *= ipsi_hrtf / contra_hrtf # H330/H30
+        output[0,:] += cancel_x
 
-    if next(count) == 2:
-        return filtered_x
-    elif audio_fx.amp_to_db(np.amax(np.abs(filtered_x)) / max) < -60:
-        return filtered_x
+    if audio_fx.amp_to_db(np.amax(np.abs(cancel_x)) / max) < -60 or next(count) >= 100:
+        return cancel_x
     else:
-        yield xtc_filter(filtered_x, hrtf, attenuation, delay, max, side) # recursive until loudness drops below rt60
+        return xtc_filter(cancel_x, hrtf, attenuation, delay, max, side) # recursive until loudness drops below rt60
 
 
 def process_signal():
@@ -104,14 +101,14 @@ def process_signal():
     # Calculate recursive cancellation
     xtc_filter(fft_sig[0,:], hrtfs, ratio, delta_t, file.max, side='left')
     l_xtc = output
-    output = np.zeros((2, fft_sig[0,:].size), dtype=complex) # Re-initialize to process right channel
+    output = np.zeros((2, len(file)), dtype=complex)
     xtc_filter(fft_sig[1,:], hrtfs, ratio, delta_t, file.max, side='right')
     r_xtc = output
 
     # Convolve ipsilateral signal with ipsilateral hrtfs
     hrtf_sig = np.copy(fft_sig)
     for i in range(0, 2):
-        hrtf_sig[i] = fft_sig[i] * hrtfs[i,i,:]
+        hrtf_sig[i] = fft_sig[i] * audio_fx.freq_invert(hrtfs[i,i,:]) # 1/H30
     
     # ifft
     ifft_sig = np.zeros((2, len(file)))
@@ -124,14 +121,14 @@ def process_signal():
         ifft_r_xtc[i] = np.real(np.fft.ifft(r_xtc[i]))
     
     # Get ipsilateral signal and contralateral signal for both left and right channel 
-    left2left = ifft_l_xtc[0,:]
-    left2right = ifft_l_xtc[1,:]
-    right2right = ifft_r_xtc[0,:]
-    right2left = ifft_r_xtc[1,:]
+    l_right2left = ifft_l_xtc[0,:]
+    l_left2right = ifft_l_xtc[1,:]
+    r_left2right = ifft_r_xtc[0,:]
+    r_right2left = ifft_r_xtc[1,:]
 
     # Sum signals to left and right
-    left_channel = audio_fx.sum_audio(ifft_sig[0], left2left, right2left)
-    right_channel = audio_fx.sum_audio(ifft_sig[1], left2right, right2right)
+    left_channel = audio_fx.sum_audio(ifft_sig[0], l_right2left, r_right2left)
+    right_channel = audio_fx.sum_audio(ifft_sig[1], l_left2right, r_left2right)
 
     # Combine channels to stereo file
     y = audio_fx.combine_channels(left_channel, right_channel)
