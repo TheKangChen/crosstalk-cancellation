@@ -1,5 +1,7 @@
 # crosstalk-cancellation
-Binaural audio reproduction through loudspeakers. Also known as crosstalk cancellation.
+Implementation of Binaural audio reproduction through loudspeakers. Also known as crosstalk cancellation.
+
+> ⚠️ Warning: Please reference this repo with caution. The math checks out but the output is incorrect.
 
 ### Read Me
 - To run the script, run `py xtc.py` in command line.
